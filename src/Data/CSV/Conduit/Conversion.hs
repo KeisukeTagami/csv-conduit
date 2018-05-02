@@ -1,9 +1,18 @@
-{-# LANGUAGE BangPatterns, CPP, FlexibleInstances, OverloadedStrings,
-             Rank2Types #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE CPP                   #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE Rank2Types            #-}
 #ifdef GENERICS
-{-# LANGUAGE DefaultSignatures, TypeOperators, KindSignatures, FlexibleContexts,
-             MultiParamTypeClasses, UndecidableInstances, ScopedTypeVariables,
-             DataKinds #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DefaultSignatures     #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE UndecidableInstances  #-}
 #endif
 
 -----------------------------------------------------------------------------
@@ -54,35 +63,36 @@ module Data.CSV.Conduit.Conversion
     , namedRecord
     ) where
 
-import Control.Applicative as A
-import Control.Monad (MonadPlus, mplus, mzero)
-import Data.Attoparsec.ByteString.Char8 (double, parseOnly)
-import qualified Data.Attoparsec.ByteString.Char8 as A8
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B8
-import qualified Data.ByteString.Lazy as L
+import           Control.Applicative                  as A
+import           Control.Monad                        (MonadPlus, mplus, mzero)
+import           Data.Attoparsec.ByteString.Char8     (double, parseOnly)
+import qualified Data.Attoparsec.ByteString.Char8     as A8
+import qualified Data.ByteString                      as B
+import qualified Data.ByteString.Char8                as B8
+import qualified Data.ByteString.Lazy                 as L
 
-import Data.Int (Int8, Int16, Int32, Int64)
-import qualified Data.Map as M
-import Data.Monoid as Monoid
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as LT
-import Data.Traversable as DT
-import Data.Vector (Vector, (!))
-import qualified Data.Vector as V
-import qualified Data.Vector.Unboxed as U
-import Data.Word as W
-import GHC.Float (double2Float)
-import Prelude hiding (lookup, takeWhile)
+import           Data.Int                             (Int16, Int32, Int64,
+                                                       Int8)
+import qualified Data.Map                             as M
+import           Data.Monoid                          as Monoid
+import qualified Data.Text                            as T
+import qualified Data.Text.Encoding                   as T
+import qualified Data.Text.Lazy                       as LT
+import qualified Data.Text.Lazy.Encoding              as LT
+import           Data.Traversable                     as DT
+import           Data.Vector                          (Vector, (!))
+import qualified Data.Vector                          as V
+import qualified Data.Vector.Unboxed                  as U
+import           Data.Word                            as W
+import           GHC.Float                            (double2Float)
+import           Prelude                              hiding (lookup, takeWhile)
 
 #ifdef GENERICS
-import GHC.Generics
-import qualified Data.IntMap as IM
+import qualified Data.IntMap                          as IM
+import           GHC.Generics
 #endif
 
-import Data.CSV.Conduit.Conversion.Internal
+import           Data.CSV.Conduit.Conversion.Internal
 
 
 ------------------------------------------------------------------------
@@ -151,7 +161,7 @@ type Field = B8.ByteString
 -- >         | otherwise     = mzero
 class FromRecord a where
     parseRecord :: Record -> Parser a
-  
+
 #ifdef GENERICS
     default parseRecord :: (Generic a, GFromRecord (Rep a)) => Record -> Parser a
     parseRecord r = to A.<$> gparseRecord r
@@ -784,6 +794,9 @@ instance Monoid.Monoid (Parser a) where
     mappend = mplus
     {-# INLINE mappend #-}
 
+instance Semigroup (Parser a) where
+
+
 apP :: Parser (a -> b) -> Parser a -> Parser b
 apP d e = do
   b <- d
@@ -810,10 +823,10 @@ class GFromRecord f where
     gparseRecord :: Record -> Parser (f p)
 
 instance GFromRecordSum f Record => GFromRecord (M1 i n f) where
-    gparseRecord v = 
+    gparseRecord v =
         case (IM.lookup n gparseRecordSum) of
-            Nothing -> lengthMismatch n v 
-            Just p -> M1 <$> p v
+            Nothing -> lengthMismatch n v
+            Just p  -> M1 <$> p v
       where
         n = V.length v
 
@@ -821,15 +834,15 @@ class GFromNamedRecord f where
     gparseNamedRecord :: NamedRecord -> Parser (f p)
 
 instance GFromRecordSum f NamedRecord => GFromNamedRecord (M1 i n f) where
-    gparseNamedRecord v = 
+    gparseNamedRecord v =
         foldr (\f p -> p <|> M1 <$> f v) empty (IM.elems gparseRecordSum)
 
 class GFromRecordSum f r where
     gparseRecordSum :: IM.IntMap (r -> Parser (f p))
 
 instance (GFromRecordSum a r, GFromRecordSum b r) => GFromRecordSum (a :+: b) r where
-    gparseRecordSum = 
-        IM.unionWith (\a b r -> a r <|> b r) 
+    gparseRecordSum =
+        IM.unionWith (\a b r -> a r <|> b r)
             (fmap (L1 <$>) <$> gparseRecordSum)
             (fmap (R1 <$>) <$> gparseRecordSum)
 
